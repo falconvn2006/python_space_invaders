@@ -1,5 +1,5 @@
 import pygame
-import sys
+import sys, random
 
 # CONSTANTS
 SCREEN_WIDTH = 750
@@ -15,6 +15,31 @@ class Alien(pygame.sprite.Sprite):
         path = f"../images/alien_{self.type}.png"
         self.image = pygame.image.load(path)
         self.rect = self.image.get_rect(topleft=(x,y))
+
+    def update(self, direction):
+        self.rect.x += direction
+
+class MysteryShips(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load("../images/mystery.png")
+
+        # Random starting x
+        x = random.choice([0, SCREEN_WIDTH - self.image.get_width()])
+        if x == 0:
+            self.speed = 3
+        else:
+            self.speed = -3
+
+        self. rect = self.image.get_rect(topleft = (x, 40))
+
+    def update(self):
+        self.rect.x += self.speed
+
+        if self.rect.right > SCREEN_WIDTH:
+            self.kill()
+        elif self.rect.left < 0:
+            self.kill()
 
 class Block(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -126,6 +151,12 @@ class SpaceInvaders:
         pygame.display.set_caption("Space Invaders")
         self.clock = pygame.time.Clock()
 
+        # CUSTOM EVENTS
+        self.SHOOT_LASER = pygame.USEREVENT
+        pygame.time.set_timer(self.SHOOT_LASER, 500)
+        self.MYSTERY_SHIP = pygame.USEREVENT + 1
+        pygame.time.set_timer(self.MYSTERY_SHIP, random.randint(4000, 8000))
+
         # Space ship setup
         self.spaceship = SpaceShip()
         self.spaceship_group = pygame.sprite.GroupSingle()
@@ -135,8 +166,14 @@ class SpaceInvaders:
         self.obstacles = self.create_obstacles()
 
         # Aliens setup
+        self.aliens_direction = 1
         self.aliens_group = pygame.sprite.Group()
         self.create_aliens()
+
+        self.alien_lasers_group = pygame.sprite.Group()
+
+        # Mystery ship
+        self.mystery_ship_group = pygame.sprite.GroupSingle()
 
     def create_obstacles(self):
         obstacle_width = len(Obstacle(0, 0).grid[0]) * 3
@@ -153,11 +190,44 @@ class SpaceInvaders:
         # TODO: Change the row and col in range so that it can be customize able
         for row in range(5):
             for col in range(11):
-                x = col * 55
-                y = row * 55
-                alien = Alien(1, x, y)
+                x = 75 + col * 55
+                y = 110 + row * 55
+
+                if row == 0:
+                    alien_type = 3
+                elif row in range(1,2):
+                    alien_type = 2
+                else:
+                    alien_type = 1
+
+                alien = Alien(alien_type, x, y)
                 self.aliens_group.add(alien)
 
+    def move_aliens(self):
+        self.aliens_group.update(self.aliens_direction)
+
+        aliens_sprite = self.aliens_group.sprites()
+        for alien in aliens_sprite:
+            if alien.rect.right >= SCREEN_WIDTH:
+                self.aliens_direction = -1
+                self.move_aliens_down(2)
+            elif alien.rect.left <= 0:
+                self.aliens_direction = 1
+                self.move_aliens_down(2)
+
+    def move_aliens_down(self, distance):
+        if self.aliens_group:
+            for alien in self.aliens_group.sprites():
+                alien.rect.y += distance
+
+    def alien_shoot_laser(self):
+        if self.aliens_group.sprites():
+            random_alien = random.choice(self.aliens_group.sprites())
+            laser_sprite = Laser(random_alien.rect.center, -6)
+            self.alien_lasers_group.add(laser_sprite)
+
+    def create_mystery_ship(self):
+        self.mystery_ship_group.add(MysteryShips())
 
     def run(self):
         while True:
@@ -165,15 +235,26 @@ class SpaceInvaders:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+                
+                if event.type == self.SHOOT_LASER:
+                    self.alien_shoot_laser()
+
+                if event.type == self.MYSTERY_SHIP:
+                    self.create_mystery_ship()
 
             # Update
             self.spaceship_group.update()
+            self.move_aliens()
+            self.alien_lasers_group.update()
+            self.mystery_ship_group.update()
 
             # Render
             self.screen.fill(GREY)
             self.spaceship_group.draw(self.screen)
             self.spaceship_group.sprite.lasers_group.draw(self.screen)
             self.aliens_group.draw(self.screen)
+            self.alien_lasers_group.draw(self.screen)
+            self.mystery_ship_group.draw(self.screen)
 
             for obstacle in self.obstacles:
                 obstacle.blocks_group.draw(self.screen)
