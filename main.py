@@ -2,6 +2,7 @@ import pygame
 import sys, random
 
 # CONSTANTS / GAME SETTINGS
+# TODO: Add some of these constant to the main code
 SCREEN_WIDTH = 750
 SCREEN_HEIGHT = 700
 OFFSET = 50
